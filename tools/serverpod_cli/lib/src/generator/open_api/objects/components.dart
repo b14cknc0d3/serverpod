@@ -4,85 +4,6 @@ part of '../open_api_objects.dart';
 /// All objects defined within the components object will have no effect
 /// on the API unless they are explicitly referenced from properties outside the
 /// components object.
-/// example.
-/// ```json
-///    "components": {
-///      "schemas": {
-///        "GeneralError": {
-///          "type": "object",
-///          "properties": {
-///            "code": {
-///              "type": "integer",
-///              "format": "int32"
-///            },
-///            "message": {
-///              "type": "string"
-///            }
-///          }
-///        },
-///      },
-///      "parameters": {
-///        "skipParam": {
-///          "name": "skip",
-///          "in": "query",
-///          "description": "number of items to skip",
-///          "required": true,
-///          "schema": {
-///            "type": "integer",
-///            "format": "int32"
-///          }
-///        },
-///        "limitParam": {
-///          "name": "limit",
-///          "in": "query",
-///          "description": "max records to return",
-///          "required": true,
-///          "schema" : {
-///            "type": "integer",
-///            "format": "int32"
-///          }
-///        }
-///      },
-///      "responses": {
-///        "NotFound": {
-///          "description": "Entity not found."
-///        },
-///        "IllegalInput": {
-///          "description": "Illegal input for operation."
-///        },
-///        "GeneralError": {
-///          "description": "General Error",
-///          "content": {
-///            "application/json": {
-///              "schema": {
-///                "$ref": "#/components/schemas/GeneralError"
-///              }
-///            }
-///          }
-///        }
-///      },
-///      "securitySchemes": {
-///        "api_key": {
-///          "type": "apiKey",
-///          "name": "api_key",
-///          "in": "header"
-///        },
-///        "petstore_auth": {
-///          "type": "oauth2",
-///          "flows": {
-///            "implicit": {
-///              "authorizationUrl": "https://example.org/api/oauth/dialog",
-///              "scopes": {
-///                "write:pets": "modify pets in your account",
-///                "read:pets": "read your pets"
-///              }
-///            }
-///          }
-///        }
-///      }
-///    }
-/// ```
-///
 class ComponentsObject {
   /// An object to hold reusable Schema Objects.
   final Set<ComponentSchemaObject>? schemas;
@@ -97,7 +18,7 @@ class ComponentsObject {
   final Map<String, RequestBodyObject>? requestBodies;
 
   /// An object to hold reusable Security Scheme Objects.
-  final Map<String, SecuritySchemeObject>? securitySchemes;
+  final Set<SecurityRequirementObject> securitySchemes;
 
   /// An object to hold reusable Path Item Object.
   final Map<String, PathItemObject>? pathItems;
@@ -106,7 +27,7 @@ class ComponentsObject {
     this.responses,
     this.parameters,
     this.requestBodies,
-    this.securitySchemes,
+    required this.securitySchemes,
     this.pathItems,
   });
 
@@ -114,16 +35,18 @@ class ComponentsObject {
     Map<String, dynamic> map = {};
 
     if (schemas != null) {
-      map['schemas'] = _getSchemaMapFromSetSchema(schemas!);
+      Map<String, dynamic> schemasMap = {};
+      for (var schema in schemas!) {
+        schemasMap.addAll(schema.toJson());
+      }
+      map['schemas'] = schemasMap;
     }
-    return map;
-  }
-
-  Map<String, dynamic> _getSchemaMapFromSetSchema(
-      Set<ComponentSchemaObject>? schemas) {
-    Map<String, dynamic> map = {};
-    for (var schema in schemas!) {
-      map.addAll(schema.toJson());
+    if (securitySchemes.isNotEmpty) {
+      var securityMap = <String, dynamic>{};
+      for (var security in securitySchemes) {
+        securityMap.addAll(security.toJson());
+      }
+      map['securitySchemes'] = securityMap;
     }
     return map;
   }

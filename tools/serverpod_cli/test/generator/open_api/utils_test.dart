@@ -4,11 +4,20 @@ import 'package:serverpod_cli/src/generator/open_api/open_api_objects.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Test SchemaObjectType and Utils: ', () {
+  group('Test Utils: ', () {
     test('When convert queryForm to query-form and path to path', () {
       expect('path', 'path'.paramCase);
       expect('query-form', 'queryForm'.paramCase);
     });
+    test('When convert subDirs to path', () {
+      List<String> subDirs = [
+        'api',
+        'v1',
+      ];
+      expect('/api/v1', getExtraPath(subDirs));
+    });
+  });
+  group('Test SchemaObjectType ', () {
     test('When convert [TypeDefinition] to [SchemaObjectType]', () {
       expect(
           'string',
@@ -41,8 +50,13 @@ void main() {
               .toSchemaObjectType
               .name);
       expect(
-          'object',
+          'other',
           TypeDefinition(className: 'Example', nullable: false)
+              .toSchemaObjectType
+              .name);
+      expect(
+          'other',
+          TypeDefinition(className: 'dynamic', nullable: false)
               .toSchemaObjectType
               .name);
     });

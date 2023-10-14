@@ -1,30 +1,33 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 part of '../open_api_objects.dart';
 
-///[TypeDefinition] toJson
-Map<String, dynamic> typeToJson(TypeDefinition type, [bool child = false]) {
+/// Serializes [TypeDefinition] all type To toJson.
+Map<String, dynamic> typeDefinitionToJson(TypeDefinition type,
+    [bool child = false]) {
   Map<String, dynamic> map = {};
-  if (type.className == 'Future') return typeToJson(type.generics.first, child);
+  if (type.className == 'Future') {
+    return typeDefinitionToJson(type.generics.first, child);
+  }
   if (type.className == 'void') return map;
   if (type.isMapType) {
-    map = mapToJson(type, child);
+    map = mapTypeToJson(type, child);
     return map;
   }
   if (type.isListType) {
-    map = listToJson(type, child);
+    map = listTypeToJson(type, child);
     return map;
   }
 
-  if (!type.isDartCoreType) {
-    map = refToJson(type, child);
+  if (type.isOtherType) {
+    map = otherTypeToJson(type, child);
     return map;
   }
   map = dartCoreTypeToJson(type, child);
   return map;
 }
 
-/// [TypeDefinition] map Type to Json
-Map<String, dynamic> mapToJson(TypeDefinition type, [bool child = false]) {
+/// Serializes a [TypeDefinition]  [Map] type to Json
+Map<String, dynamic> mapTypeToJson(TypeDefinition type, [bool child = false]) {
   assert(type.isMapType,
       'Use mapToJson only when the typeDefinition is of the MapType.');
 
@@ -32,110 +35,133 @@ Map<String, dynamic> mapToJson(TypeDefinition type, [bool child = false]) {
   map['type'] = SchemaObjectType.object.name;
   if (type.nullable) map['nullable'] = true;
 
-  /// If data is Map<String,int>  use last int as additionalProperties
+  // If data is Map<String,int>  use last int from generics as
+  // additionalProperties
+  if (type.generics.isEmpty) return map;
   var lastType = type.generics.last;
-  if (lastType.isDartCoreType) {
-    if (lastType.isListType) {
-      map['additionalProperties'] = listToJson(lastType, true);
-    } else if (lastType.isMapType) {
-      map['additionalProperties'] = mapToJson(lastType, true);
-    } else {
-      map['additionalProperties'] = dartCoreTypeToJson(
-        lastType,
-        true,
-      );
-    }
+  if (lastType.isListType) {
+    map['additionalProperties'] = listTypeToJson(lastType, true);
+  } else if (lastType.isMapType) {
+    map['additionalProperties'] = mapTypeToJson(lastType, true);
+  } else if (lastType.isOtherType) {
+    map['additionalProperties'] = otherTypeToJson(lastType, true);
   } else {
-    map['additionalProperties'] = refToJson(lastType, true);
+    map['additionalProperties'] = dartCoreTypeToJson(
+      lastType,
+      true,
+    );
   }
 
   return map;
 }
 
-/// [TypeDefinition] dartCoreType to Json (string,bool,double,int,BigInt,)
+/// Serializes a [TypeDefinition]  dart core type (string,bool,double,int,
+/// BigInt,...) to Json
 Map<String, dynamic> dartCoreTypeToJson(TypeDefinition type,
     [bool child = false]) {
+  assert(type.toSchemaObjectType != SchemaObjectType.other,
+      'SchemaObjectType should not be other type');
   assert(
-      type.className == 'String' ||
-          type.className == 'int' ||
-          type.className == 'double' ||
-          type.className == 'bool' ||
-          type.className == 'BigInt',
-      'Use dartCoreTypeToJson only when class Name are String,int,double,BigInt,bool, ');
+    type.toSchemaObjectType != SchemaObjectType.array,
+  );
+  assert(
+    type.toSchemaObjectType != SchemaObjectType.object,
+  );
   Map<String, dynamic> map = {};
-  map['type'] = SchemaObjectType.string.name;
+  map['type'] = type.toSchemaObjectType.name;
   if (type.nullable) map['nullable'] = true;
   return map;
 }
 
-///[TypeDefinition] custom class (!dartCoreType) to json
-Map<String, dynamic> refToJson(TypeDefinition type, [bool child = false]) {
+/// Serializes an [SchemaObjectType.other] to json
+Map<String, dynamic> otherTypeToJson(TypeDefinition type,
+    [bool child = false]) {
+  assert(type.toSchemaObjectType == SchemaObjectType.other,
+      'Use otherTypeToJson only when the SchemaObjectType is other.');
   Map<String, dynamic> map = {};
+  // Other types are always object.
   if (!child) map['type'] = SchemaObjectType.object.name;
-  map['\$ref'] = getRef(type.className);
+  map['\$ref'] =
+      _getRef(type.className == 'dynamic' ? 'AnyValue' : type.className);
   if (type.nullable && !child) map['nullable'] = true;
   return map;
 }
 
-/// [TypeDefinition] list Type to Json
-Map<String, dynamic> listToJson(TypeDefinition type, [bool child = false]) {
+/// Serializes a [TypeDefinition] [List] type to Json
+Map<String, dynamic> listTypeToJson(TypeDefinition type, [bool child = false]) {
   assert(type.isListType,
-      'Use listToJson only when the typeDefinition is of the ListType.');
+      'Use listTypeToJson only when the typeDefinition is of the ListType.');
   Map<String, dynamic> map = {};
-  map['type'] = SchemaObjectType.object.name;
+  map['type'] = SchemaObjectType.array.name;
 
   map['items'] = {};
-  if (type.generics.isEmpty) {
-    map['items']['\$ref'] = getRef('AnyValue');
+
+  var generic = type.generics;
+  if (generic.isEmpty) {
+    map['items']['\$ref'] = _getRef('AnyValue');
     return map;
   }
-  if (type.generics.first.isListType) {
-    map['items'] = listToJson(type.generics.first, true);
+  if (generic.first.isListType) {
+    map['items'] = listTypeToJson(generic.first, true);
     return map;
   }
-  if (type.generics.first.isMapType) {
-    map['items'] = mapToJson(type, true);
+  if (generic.first.isMapType) {
+    map['items'] = mapTypeToJson(generic.first, true);
     return map;
   }
 
-  if (!type.generics.first.isDartCoreType) {
-    map['items'] = refToJson(type.generics.first, true);
+  if (generic.first.isOtherType) {
+    map['items'] = otherTypeToJson(generic.first, true);
     return map;
   }
-  map['items'] = dartCoreTypeToJson(type.generics.first, true);
+  map['items'] = dartCoreTypeToJson(generic.first, true);
   return map;
 }
 
-/// A Schema object which will use in [ComponentObject]
+///  Schema object used within [ComponentObject]
 class ComponentSchemaObject {
-  final ClassDefinition classDefinition;
+  final SerializableEntityDefinition entityDefinition;
 
   ComponentSchemaObject(
-    this.classDefinition,
+    this.entityDefinition,
   );
 
   Map<String, dynamic> toJson() {
     Map<String, dynamic> map = {};
 
+    if (entityDefinition is EnumDefinition) {
+      var enumDefinition = entityDefinition as EnumDefinition;
+      map[entityDefinition.className] = {
+        'type': SchemaObjectType.string.name,
+        'enum': enumDefinition.values.map((e) => e.name).toList(),
+      };
+      return map;
+    }
+    var classDefinition = entityDefinition as ClassDefinition;
     Map<String, dynamic> objectMap = {};
     objectMap['type'] = SchemaObjectType.object.name;
     objectMap['properties'] = {};
     for (var field in classDefinition.fields) {
       objectMap['properties'][field.name] = {};
       if (field.type.isListType) {
-        objectMap['properties'][field.name] = listToJson(field.type);
+        objectMap['properties'][field.name] = listTypeToJson(field.type, true);
       } else if (field.type.isMapType) {
-        objectMap['properties'][field.name] = mapToJson(field.type);
+        objectMap['properties'][field.name] = mapTypeToJson(field.type, true);
+      } else if (field.type.isOtherType) {
+        objectMap['properties'][field.name] = otherTypeToJson(field.type, true);
       } else {
-        objectMap['properties'][field.name] = dartCoreTypeToJson(field.type);
+        objectMap['properties'][field.name] =
+            dartCoreTypeToJson(field.type, true);
       }
     }
-    map[classDefinition.className] = objectMap;
+    map[entityDefinition.className] = objectMap;
 
     return map;
   }
 }
 
+/// A Schema object used within [ContentObject]. Generate request body content
+/// based on the parameters of a Serverpod endpoint's method.
 class RequestContentSchemaObject {
   final List<ParameterDefinition> params;
   RequestContentSchemaObject({
@@ -147,8 +173,7 @@ class RequestContentSchemaObject {
     map['type'] = SchemaObjectType.object.name;
     map['properties'] = {};
     for (var param in params) {
-      if (param.type.className == 'ByteData') continue;
-      map['properties'][param.name] = typeToJson(param.type, true);
+      map['properties'][param.name] = typeDefinitionToJson(param.type, true);
     }
 
     return map;
@@ -168,7 +193,7 @@ class ParameterSchemaObject {
       map['enum'] = {};
       return map;
     }
-    map = typeToJson(typeDefinition);
+    map = typeDefinitionToJson(typeDefinition);
     return map;
   }
 }

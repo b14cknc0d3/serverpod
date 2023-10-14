@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:serverpod_cli/src/generator/open_api/open_api_objects.dart';
 import 'package:serverpod_cli/src/logger/logger.dart';
 import 'package:serverpod_cli/src/util/locate_modules.dart';
 import 'package:source_span/source_span.dart';
@@ -34,6 +36,8 @@ class GeneratorConfig {
     required List<String> relativeDartClientPackagePathParts,
     required this.modules,
     required this.extraClasses,
+    this.servers = const {},
+    this.openApiInfo,
   }) : _relativeDartClientPackagePathParts = relativeDartClientPackagePathParts;
 
   /// The name of the serverpod project.
@@ -114,6 +118,13 @@ class GeneratorConfig {
   /// Useful for types used in caching and streams.
   final List<TypeDefinition> extraClasses;
 
+  /// A list of server for OpenApi retrieved from the
+  /// config.
+  final Set<ServerObject> servers;
+
+  /// H0lds the openapi information retrieved from the config.
+  final InfoObject? openApiInfo;
+
   /// Create a new [GeneratorConfig] by loading the configuration in the [dir].
   static Future<GeneratorConfig?> load([String dir = '']) async {
     var serverPackageDirectoryPathParts = p.split(dir);
@@ -137,6 +148,9 @@ class GeneratorConfig {
     var serverPackage = pubspec['name'];
     var name = _stripPackage(serverPackage);
 
+    Set<ServerObject> servers = _getServersFromConfigs(dir);
+    InfoObject? openApiInfo;
+
     Map? generatorConfig;
     try {
       var file = File(p.join(dir, 'config', 'generator.yaml'));
@@ -147,8 +161,39 @@ class GeneratorConfig {
           'project?');
       return null;
     }
+    bool hasOpenApiMap = generatorConfig!.containsKey('openapi');
+    if (hasOpenApiMap) {
+      try {
+        Map<String, dynamic> openApiMap = jsonDecode(
+          jsonEncode(
+            generatorConfig['openapi'],
+          ),
+        );
+        LicenseObject? licenseObject = openApiMap.containsKey('license')
+            ? LicenseObject.fromJson(openApiMap['license'])
+            : null;
+        ContactObject? contactObject = openApiMap.containsKey('contact')
+            ? ContactObject.fromJson(openApiMap['contact'])
+            : null;
+        Uri? termsOfService = openApiMap.containsKey('termsOfService')
+            ? Uri.parse(openApiMap['termsOfService'])
+            : null;
+        openApiInfo = InfoObject(
+          title: openApiMap['info']['title'],
+          description: openApiMap['info']['description'],
+          version: pubspec['version'],
+          license: licenseObject,
+          contact: contactObject,
+          termsOfService: termsOfService,
+        );
+      } catch (e) {
+        log.error(
+          'There\'s an issue with the \'openapi\' section in config/generator.yaml',
+        );
+      }
+    }
 
-    var typeStr = generatorConfig!['type'];
+    var typeStr = generatorConfig['type'];
     late PackageType type;
     if (typeStr == 'module') {
       type = PackageType.module;
@@ -247,15 +292,18 @@ class GeneratorConfig {
     }
 
     return GeneratorConfig(
-        name: name,
-        type: type,
-        serverPackage: serverPackage,
-        dartClientPackage: dartClientPackage,
-        dartClientDependsOnServiceClient: dartClientDependsOnServiceClient,
-        serverPackageDirectoryPathParts: serverPackageDirectoryPathParts,
-        relativeDartClientPackagePathParts: relativeDartClientPackagePathParts,
-        modules: modules,
-        extraClasses: extraClasses);
+      name: name,
+      type: type,
+      serverPackage: serverPackage,
+      dartClientPackage: dartClientPackage,
+      dartClientDependsOnServiceClient: dartClientDependsOnServiceClient,
+      serverPackageDirectoryPathParts: serverPackageDirectoryPathParts,
+      relativeDartClientPackagePathParts: relativeDartClientPackagePathParts,
+      modules: modules,
+      extraClasses: extraClasses,
+      servers: servers,
+      openApiInfo: openApiInfo,
+    );
   }
 
   @override
@@ -273,6 +321,42 @@ generatedServerProtocol: ${p.joinAll(generatedServerProtocolPathParts)}
       }
     }
     return str;
+  }
+
+  static Set<ServerObject> _getServersFromConfigs(String dir) {
+    Set<ServerObject> servers = {};
+    for (var path in ['development', 'staging', 'production']) {
+      try {
+        Map? apiConfig;
+        var file = File(
+          p.join(dir, 'config', '$path.yaml'),
+        );
+        var yamlStr = file.readAsStringSync();
+        apiConfig = loadYaml(yamlStr) as YamlMap;
+        if (apiConfig.isNotEmpty) {
+          var configs = jsonDecode(jsonEncode(apiConfig));
+          var serverMap = configs['apiServer'];
+
+          if (serverMap.isNotEmpty) {
+            try {
+              servers.add(
+                ServerObject(
+                  url: _getUrl(serverMap),
+                  description: '$path server',
+                ),
+              );
+            } catch (e) {
+              log.debug(
+                'Invalid value in \'apiServer\'. Please check the value in the \'config/$path.yaml\'',
+              );
+            }
+          }
+        }
+      } catch (_) {
+        log.debug('Failed to load config/$path.yaml');
+      }
+    }
+    return servers;
   }
 }
 
@@ -327,4 +411,12 @@ String _stripPackage(String package) {
     return strippedPackage.substring(0, strippedPackage.length - 7);
   }
   return package;
+}
+
+/// Get [Uri] from publicHost/port and publicScheme.
+Uri _getUrl(Map<String, dynamic> value) {
+  if (value['publicScheme'] == 'http') {
+    return Uri.http("${value['publicHost']}:${value['publicPort']}");
+  }
+  return Uri.https(value['publicHost']);
 }

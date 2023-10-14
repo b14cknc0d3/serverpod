@@ -1,5 +1,6 @@
 part of '../open_api_objects.dart';
 
+/// The [InfoObject] is used to provide metadata and information about the API.
 /// eg.
 /// ```
 ///     {
@@ -30,7 +31,6 @@ class InfoObject {
   final String? description;
 
   /// A URL to the Terms of Service for the API.
-  /// This must be in the form of a URL.
   final Uri? termsOfService;
 
   /// Contact information for the exposed API.
@@ -53,6 +53,14 @@ class InfoObject {
     required this.version,
   });
 
+  factory InfoObject.fromJson(Map<String, dynamic> map) {
+    return InfoObject(
+      title: map['title'],
+      version: map['version'],
+      description: map['description'],
+    );
+  }
+
   Map<String, dynamic> toJson() {
     var map = <String, dynamic>{
       'title': title,
@@ -73,11 +81,11 @@ class InfoObject {
     if (termsOfService != null) {
       map['termsOfService'] = termsOfService?.toString();
     }
-
     return map;
   }
 }
 
+/// Information about the license governing the use of the API.
 /// example
 ///```json
 ///  {
@@ -89,17 +97,12 @@ class LicenseObject {
   /// The license name used for the API.
   final String name;
 
-  /// An SPDX license expression for the API.
-  /// The identifier field is mutually exclusive of the url field.
-  final String? identifier;
-
   /// A URL to the license used for the API.
   /// This must be in the form of a URL.
   /// The url field is mutually exclusive of the identifier field.
   final Uri? url;
   LicenseObject({
     required this.name,
-    this.identifier,
     this.url,
   });
 
@@ -107,16 +110,21 @@ class LicenseObject {
     var map = {
       'name': name,
     };
-    if (identifier != null) {
-      map['identifier'] = identifier!;
-    }
     if (url != null) {
       map['url'] = url.toString();
     }
     return map;
   }
+
+  factory LicenseObject.fromJson(Map<String, dynamic> map) {
+    return LicenseObject(
+      name: map['name'] as String,
+      url: map['url'] != null ? Uri.parse(map['url']) : null,
+    );
+  }
 }
 
+/// Information about the organization or individual responsible for the API.
 /// example.
 ///```json
 /// {
@@ -135,7 +143,6 @@ class ContactObject {
   final Uri url;
 
   /// The email address of the contact person/organization.
-  /// This must be in the form of an email address.
   final String email;
   ContactObject({
     required this.name,
@@ -149,6 +156,14 @@ class ContactObject {
       'url': url.toString(),
       'email': email,
     };
+  }
+
+  factory ContactObject.fromJson(Map<String, dynamic> map) {
+    return ContactObject(
+      name: map['name'] as String,
+      url: Uri.parse(map['url'] as String),
+      email: map['email'] as String,
+    );
   }
 }
 
@@ -173,5 +188,13 @@ class ExternalDocumentationObject {
       map['description'] = description!;
     }
     return map;
+  }
+
+  factory ExternalDocumentationObject.fromJson(Map<String, dynamic> map) {
+    return ExternalDocumentationObject(
+      url: Uri.parse(map['url'] as String),
+      description:
+          map['description'] != null ? map['description'] as String : null,
+    );
   }
 }

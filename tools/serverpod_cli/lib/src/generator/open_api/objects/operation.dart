@@ -2,7 +2,8 @@ part of '../open_api_objects.dart';
 
 /// Describes a single API operation on a path.
 class OperationObject {
-  /// A list of tags for API documentation control. Tags can be used for logical grouping of operations by resources or any other qualifier.
+  /// A list of tags for API documentation control. Tags can be used for
+  /// logical grouping of operations by resources or any other qualifier.
   final List<String>? tags;
 
   /// A short summary of what the operation does.
@@ -17,7 +18,8 @@ class OperationObject {
   /// case-sensitive. Tools and libraries may use the operationId to uniquely
   /// identify an operation, therefore, it is recommended to follow common
   /// programming naming conventions. It should be serverpod endpoint's method
-  /// name eg ``` findPetById ```
+  /// name and endpoint name. eg `<endpointMethodName><EndpointName>`
+  /// (`findPetByIdPet`)
   final String? operationId;
 
   /// A list of parameters that are applicable for this operation.
@@ -29,16 +31,13 @@ class OperationObject {
   final List<ParameterObject> parameters;
 
   /// The request body applicable for this operation.
-  /// The requestBody is fully supported in HTTP methods where the HTTP 1.1
-  /// specification RFC7231 has explicitly defined semantics for request bodies.
-  /// In other cases where the HTTP spec is vague
-  /// (such as GET, HEAD and DELETE),
-  /// requestBody is permitted but does not have well-defined semantics
-  /// and should be avoided if possible.
+  /// Serverpod endpoint method parameters are represented as
+  /// [RequestBodyObject] in the OpenAPI specification.
   final RequestBodyObject? requestBody;
 
   /// The list of possible responses as they are returned from executing
-  /// this operation.
+  /// this operation. The [ResponseObject] corresponds to the return type of a
+  /// serverpod endpoint method.
   final ResponseObject responses;
 
   /// Declares this operation to be deprecated. Consumers should refrain
@@ -46,8 +45,10 @@ class OperationObject {
   /// Default value is false.
   final bool deprecated;
 
-  final SecurityRequirementObject security;
+  /// The [security] represents a set of serverpod security requirements.
+  final Set<SecurityRequirementObject> security;
 
+  /// Override the top-level server definition.
   final List<ServerObject>? servers;
   OperationObject({
     this.tags,
@@ -57,8 +58,8 @@ class OperationObject {
     this.operationId,
     required this.parameters,
     this.requestBody,
-    this.deprecated = false,
     required this.responses,
+    this.deprecated = false,
     required this.security,
     this.servers,
   });
@@ -89,6 +90,9 @@ class OperationObject {
 
     if (parameters.isNotEmpty) {
       map['parameters'] = parameters.map((e) => e.toJson()).toList();
+    }
+    if (security.isNotEmpty) {
+      map['security'] = security.map((e) => e.toJson(true)).toList();
     }
     map['responses'] = responses.toJson();
 
